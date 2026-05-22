@@ -1,7 +1,8 @@
 window.ProductCard = {
   getStatus(item) {
+    const lowStockLimit = Number(window.DressiSettings?.lowStockLimit || 5);
     if (item.stock === 0) return { label: 'Out of stock', className: 'status-out' };
-    if (item.stock <= 5) return { label: 'Low stock', className: 'status-low' };
+    if (item.stock <= lowStockLimit) return { label: 'Low stock', className: 'status-low' };
     return { label: 'Available', className: 'status-good' };
   },
 
@@ -14,10 +15,15 @@ window.ProductCard = {
 
   render(item) {
     const escapeHtml = window.DressiUtils?.escapeHtml || (value => String(value ?? ''));
+    const currency = window.DressiUtils?.currency || (value => new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(value));
     const status = this.getStatus(item);
     const price = item.oldPrice
-      ? `<span class="old-price">$${escapeHtml(item.oldPrice)}.00</span> $${escapeHtml(item.price)}.00`
-      : `$${escapeHtml(item.price)}.00`;
+      ? `<span class="old-price">${escapeHtml(currency(item.oldPrice))}</span> ${escapeHtml(currency(item.price))}`
+      : escapeHtml(currency(item.price));
 
     return `
       <article class="product-card" data-product-card="${item.id}">
