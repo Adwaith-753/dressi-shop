@@ -256,21 +256,78 @@ function safeFileName(value) {
 
 function fileExtension(file) {
   const nameExtension = file.name.includes('.') ? file.name.split('.').pop() : '';
-  if (nameExtension) return nameExtension.toLowerCase();
+  if (nameExtension) {
+    const extension = nameExtension.toLowerCase();
+    return extension === 'jpeg' ? 'jpg' : extension;
+  }
   return (file.type.split('/')[1] || 'jpg').toLowerCase();
+}
+
+function loadImageElement(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.addEventListener('load', () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    });
+    image.addEventListener('error', () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Could not read selected image.'));
+    });
+
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error('Could not compress selected image.'));
+    }, type, quality);
+  });
+}
+
+async function compressImageFile(file) {
+  const maxSize = 1200;
+  const quality = 0.78;
+  const image = await loadImageElement(file);
+  const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+
+  canvas.width = width;
+  canvas.height = height;
+  context.drawImage(image, 0, 0, width, height);
+
+  const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+  const compressedName = `${safeFileName(file.name.replace(/\.[^.]+$/, ''))}.jpg`;
+
+  return new File([blob], compressedName, {
+    type: 'image/jpeg',
+    lastModified: Date.now()
+  });
 }
 
 async function uploadDressImage(file, sku) {
   if (!file) return '';
   if (!supabaseClient) throw new Error('Supabase is not connected.');
 
-  const extension = fileExtension(file);
-  const path = `${Date.now()}-${safeFileName(sku || file.name)}.${extension}`;
+  const imageFile = await compressImageFile(file);
+  const extension = fileExtension(imageFile);
+  const path = `${Date.now()}-${safeFileName(sku || imageFile.name)}.${extension}`;
   const { error } = await supabaseClient.storage
     .from('dress-images')
-    .upload(path, file, {
+    .upload(path, imageFile, {
       cacheControl: '3600',
-      contentType: file.type || 'image/jpeg',
+      contentType: imageFile.type || 'image/jpeg',
       upsert: false
     });
 
