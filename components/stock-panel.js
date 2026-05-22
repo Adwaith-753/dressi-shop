@@ -107,7 +107,7 @@ window.StockPanel = {
               </label>
               <label>
                 Price
-                <input id="newPrice" type="number" min="1" max="999" value="40" required>
+                <input id="newPrice" type="number" min="1" max="999999" value="2500" required>
               </label>
               <label class="image-upload-field">
                 Dress image
