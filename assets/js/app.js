@@ -188,9 +188,6 @@ function mapOrderToDb(order) {
     customer_name: order.customerName,
     items: order.items,
     total: order.total,
-    date_text: order.date,
-    order_date: order.orderDate,
-    line_items: order.lineItems,
     names: order.names
   };
 }
