@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dressi - Dress Stock Count Checker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <main>
+    <section class="home-page" id="homePage">
+      <nav class="site-nav">
+        <button class="logo" type="button" data-home-link>Dressi</button>
+        <div class="nav-links">
+          <button type="button" class="nav-link active" data-page-nav="home">Home</button>
+          <button type="button" class="nav-link" id="navShopBtn" data-page-nav="shop">Shop</button>
+          <button type="button" class="nav-link" data-about-open data-page-nav="about">About</button>
+          <button type="button" class="nav-link" data-history-open data-page-nav="history">History</button>
+          <button type="button" class="icon-btn cart-btn" aria-label="Cart">
+            <span data-icon="shopping-bag"></span>
+            <span data-cart-count>0</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Women's outfit stock 2026</p>
+          <h1>Summer Dress Collection</h1>
+          <p class="hero-text">Check every dress count, size, color, rack and restock level from one beautiful shop page.</p>
+          <button class="primary-btn" type="button" id="goShopBtn">
+            Go To Shop
+            <span data-icon="arrow-up-right"></span>
+          </button>
+        </div>
+        <div class="hero-media">
+          <div class="hero-slider" id="heroSlider" aria-label="Featured dress slider"></div>
+          <div class="stock-badge">
+            <strong id="homeStockTotal">0</strong>
+            <span>dresses in stock</span>
+          </div>
+          <div class="hero-pagination" id="heroPagination" aria-label="Slider pagination"></div>
+        </div>
+      </div>
+      <footer class="site-footer">
+        <strong>Dressi</strong>
+        <p>&copy; 2026 Dressi. All rights reserved.</p>
+      </footer>
+    </section>
+
+    <section class="shop-page hidden" id="shopPage">
+      <nav class="site-nav">
+        <button class="logo" type="button" data-home-link>Dressi</button>
+        <div class="nav-links">
+          <button type="button" class="nav-link" id="shopTopHomeBtn" data-page-nav="home">Home</button>
+          <button type="button" class="nav-link active" data-page-nav="shop">Shop</button>
+          <button type="button" class="nav-link" data-about-open data-page-nav="about">About</button>
+          <button type="button" class="nav-link" data-history-open data-page-nav="history">History</button>
+          <button type="button" class="icon-btn cart-btn" aria-label="Cart">
+            <span data-icon="shopping-bag"></span>
+            <span data-cart-count>0</span>
+          </button>
+        </div>
+      </nav>
+
+      <header class="shop-header">
+        <div>
+          <p class="eyebrow">Dress stock checking system</p>
+          <h1>Shop Dresses</h1>
+        </div>
+        <div class="shop-header-actions">
+          <label class="search-box">
+            <span data-icon="search"></span>
+            <input id="globalSearch" type="search" placeholder="Search dress, size, color, vendor">
+          </label>
+        </div>
+      </header>
+
+      <div class="shop-tools">
+        <div class="filter-group" role="tablist" aria-label="Inventory filter">
+          <button class="filter-btn active" type="button" data-filter="all">All</button>
+          <button class="filter-btn" type="button" data-filter="low">Low Stock</button>
+          <button class="filter-btn" type="button" data-filter="healthy">Available</button>
+        </div>
+        <button class="primary-btn stock-manager-btn" type="button" id="viewStockBtn">
+          <span data-icon="package-search"></span>
+          View Stock
+        </button>
+      </div>
+
+      <div class="product-grid" id="productGrid" aria-label="Dress product cards"></div>
+      <footer class="site-footer">
+        <strong>Dressi</strong>
+        <p>&copy; 2026 Dressi. All rights reserved.</p>
+      </footer>
+    </section>
+
+    <div class="stock-panel-overlay hidden" id="stockPanelOverlay" aria-hidden="true">
+      <section class="stock-panel" role="dialog" aria-modal="true" aria-labelledby="stockPanelTitle">
+        <button class="panel-close" type="button" id="closeStockPanel" aria-label="Close stock panel">
+          <span data-icon="x"></span>
+        </button>
+        <div id="stockPanelContent"></div>
+      </section>
+    </div>
+
+    <section class="cart-page hidden" id="cartPage">
+      <nav class="site-nav">
+        <button class="logo" type="button" data-home-link>Dressi</button>
+        <div class="nav-links">
+          <button type="button" class="nav-link" id="cartHomeBtn" data-page-nav="home">Home</button>
+          <button type="button" class="nav-link" id="cartShopBtn" data-page-nav="shop">Shop</button>
+          <button type="button" class="nav-link" data-about-open data-page-nav="about">About</button>
+          <button type="button" class="nav-link" id="cartHistoryBtn" data-page-nav="history">History</button>
+          <button type="button" class="icon-btn cart-btn active" aria-label="Cart">
+            <span data-icon="shopping-bag"></span>
+            <span data-cart-count>0</span>
+          </button>
+        </div>
+      </nav>
+
+      <header class="history-header">
+        <p class="eyebrow">Order checkout</p>
+        <h1>Cart</h1>
+      </header>
+
+      <div id="cartPageContent"></div>
+      <footer class="site-footer">
+        <strong>Dressi</strong>
+        <p>&copy; 2026 Dressi. All rights reserved.</p>
+      </footer>
+    </section>
+
+    <section class="history-page hidden" id="historyPage">
+      <nav class="site-nav">
+        <button class="logo" type="button" data-home-link>Dressi</button>
+        <div class="nav-links">
+          <button type="button" class="nav-link" id="historyHomeBtn" data-page-nav="home">Home</button>
+          <button type="button" class="nav-link" id="historyShopBtn" data-page-nav="shop">Shop</button>
+          <button type="button" class="nav-link" data-about-open data-page-nav="about">About</button>
+          <button type="button" class="nav-link active" data-page-nav="history">History</button>
+          <button type="button" class="icon-btn cart-btn" aria-label="Cart">
+            <span data-icon="shopping-bag"></span>
+            <span data-cart-count>0</span>
+          </button>
+        </div>
+      </nav>
+
+      <header class="history-header">
+        <div>
+          <p class="eyebrow">Order records</p>
+          <h1>Order History</h1>
+        </div>
+        <div class="history-actions">
+          <label class="search-box">
+            <span data-icon="search"></span>
+            <input id="historySearch" type="search" placeholder="Search customer, order, dress">
+          </label>
+          <div class="date-range-filter" aria-label="Order date range">
+            <span class="date-range-title">Date range</span>
+            <div class="date-range-fields">
+              <label class="date-filter-field">
+                <span>From</span>
+                <input id="historyFromDate" type="date">
+              </label>
+              <span class="date-range-separator"></span>
+              <label class="date-filter-field">
+                <span>To</span>
+                <input id="historyToDate" type="date">
+              </label>
+            </div>
+            <button class="date-clear-btn" type="button" id="clearHistoryDates" aria-label="Clear date filter">
+              <span data-icon="x"></span>
+            </button>
+          </div>
+          <button class="primary-btn" type="button" id="downloadHistoryBtn">
+            <span data-icon="download"></span>
+            Download All
+          </button>
+        </div>
+      </header>
+
+      <div id="historyPageContent"></div>
+      <footer class="site-footer">
+        <strong>Dressi</strong>
+        <p>&copy; 2026 Dressi. All rights reserved.</p>
+      </footer>
+    </section>
+
+    <section class="about-page hidden" id="aboutPage">
+      <nav class="site-nav">
+        <button class="logo" type="button" data-home-link>Dressi</button>
+        <div class="nav-links">
+          <button type="button" class="nav-link" id="aboutHomeBtn" data-page-nav="home">Home</button>
+          <button type="button" class="nav-link" id="aboutShopBtn" data-page-nav="shop">Shop</button>
+          <button type="button" class="nav-link active" data-page-nav="about">About</button>
+          <button type="button" class="nav-link" id="aboutHistoryBtn" data-page-nav="history">History</button>
+          <button type="button" class="icon-btn cart-btn" aria-label="Cart">
+            <span data-icon="shopping-bag"></span>
+            <span data-cart-count>0</span>
+          </button>
+        </div>
+      </nav>
+
+      <section class="about-content">
+        <div>
+          <p class="eyebrow">About Dressi</p>
+          <h1>Fashion shop with stock control</h1>
+          <p>Dressi helps a small dress shop sell products, count available stock, record sold items, manage new dresses, and keep order history in one simple browser-based system.</p>
+        </div>
+        <div class="about-grid">
+          <article>
+            <span data-icon="shopping-bag"></span>
+            <h2>Shop</h2>
+            <p>Browse dress cards, add items to cart, and place customer orders.</p>
+          </article>
+          <article>
+            <span data-icon="package-search"></span>
+            <h2>Stock</h2>
+            <p>Add new dresses, upload images, and update stock or sold records.</p>
+          </article>
+          <article>
+            <span data-icon="receipt-text"></span>
+            <h2>History</h2>
+            <p>Track completed orders, search records, and download invoices.</p>
+          </article>
+        </div>
+      </section>
+      <footer class="site-footer">
+        <strong>Dressi</strong>
+        <p>&copy; 2026 Dressi. All rights reserved.</p>
+      </footer>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/dresses.js"></script>
+  <script src="components/product-card.js"></script>
+  <script src="components/stock-panel.js"></script>
+  <script src="components/shop-controls.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
