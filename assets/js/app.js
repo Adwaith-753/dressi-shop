@@ -58,7 +58,8 @@ function loadInventory() {
   return items;
 }
 
-const inventory = loadInventory();
+const supabaseClient = window.supabaseClient || null;
+let inventory = loadInventory();
 let currentFilter = 'all';
 
 const els = {
@@ -108,7 +109,7 @@ let placedOrderCount = 0;
 let heroSlideIndex = 0;
 let heroSlideTimer = null;
 const cartItems = new Map();
-const orderHistory = loadStoredValue(STORAGE_KEYS.orderHistory, []);
+let orderHistory = loadStoredValue(STORAGE_KEYS.orderHistory, []);
 placedOrderCount = orderHistory.length;
 
 function saveInventory() {
@@ -122,6 +123,158 @@ function saveOrderHistory() {
 function saveAppData() {
   saveInventory();
   saveOrderHistory();
+}
+
+function replaceArrayContents(target, nextItems) {
+  target.splice(0, target.length, ...nextItems);
+}
+
+function mapDressFromDb(row) {
+  return {
+    id: Number(row.id),
+    name: row.name || '',
+    sku: row.sku || '',
+    type: row.type || '',
+    size: row.size || '',
+    color: row.color || '',
+    colorHex: row.color_hex || '#ef4f5f',
+    stock: Number(row.stock || 0),
+    sold: Number(row.sold || 0),
+    vendor: row.vendor || '',
+    price: Number(row.price || 0),
+    oldPrice: row.old_price === null || row.old_price === undefined ? undefined : Number(row.old_price),
+    rating: Number(row.rating || 4),
+    sale: Boolean(row.sale),
+    image: row.image_url || 'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?auto=format&fit=crop&w=700&q=80'
+  };
+}
+
+function mapDressToDb(item) {
+  return {
+    name: item.name,
+    sku: item.sku,
+    type: item.type,
+    size: item.size,
+    color: item.color,
+    color_hex: item.colorHex,
+    stock: item.stock,
+    sold: item.sold || 0,
+    vendor: item.vendor,
+    price: item.price,
+    rating: item.rating || 4,
+    image_url: item.image
+  };
+}
+
+function mapOrderFromDb(row) {
+  const createdAt = row.created_at ? new Date(row.created_at) : new Date();
+  return {
+    id: row.id,
+    orderNo: row.order_no,
+    customerName: row.customer_name || 'Walk-in Customer',
+    items: Number(row.items || 0),
+    total: Number(row.total || 0),
+    date: row.date_text || createdAt.toLocaleString(),
+    orderDate: row.order_date || dateInputValue(createdAt),
+    lineItems: Array.isArray(row.line_items) ? row.line_items : [],
+    names: row.names || ''
+  };
+}
+
+function mapOrderToDb(order) {
+  return {
+    order_no: order.orderNo,
+    customer_name: order.customerName,
+    items: order.items,
+    total: order.total,
+    date_text: order.date,
+    order_date: order.orderDate,
+    line_items: order.lineItems,
+    names: order.names
+  };
+}
+
+function renderCurrentPage() {
+  renderHeroSlider();
+  if (!els.shopPage.classList.contains('hidden')) renderProducts();
+  if (!els.cartPage.classList.contains('hidden')) renderCartPage();
+  if (!els.historyPage.classList.contains('hidden')) renderHistoryPage();
+}
+
+async function loadInventoryFromSupabase() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('dresses').select('*').order('created_at', { ascending: true });
+  if (error) {
+    window.alert(`Could not load dresses from Supabase: ${error.message}`);
+    return;
+  }
+  replaceArrayContents(inventory, (data || []).map(mapDressFromDb));
+  activeStockItemId = inventory.find(item => item.id === activeStockItemId)?.id ?? inventory[0]?.id ?? null;
+  saveInventory();
+}
+
+async function loadOrdersFromSupabase() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
+  if (error) {
+    window.alert(`Could not load orders from Supabase: ${error.message}`);
+    return;
+  }
+  orderHistory = (data || []).map(mapOrderFromDb);
+  placedOrderCount = orderHistory.length;
+  saveOrderHistory();
+}
+
+async function loadRemoteData() {
+  if (!supabaseClient) {
+    window.alert('Supabase is not connected. Check your internet connection and reload the page.');
+    return;
+  }
+  await Promise.all([loadInventoryFromSupabase(), loadOrdersFromSupabase()]);
+  renderCurrentPage();
+}
+
+async function insertDress(item) {
+  if (!supabaseClient) throw new Error('Supabase is not connected.');
+  const { data, error } = await supabaseClient.from('dresses').insert(mapDressToDb(item)).select().single();
+  if (error) throw error;
+  const savedItem = mapDressFromDb(data);
+  inventory.push(savedItem);
+  saveInventory();
+  return savedItem;
+}
+
+async function updateDress(item) {
+  if (!supabaseClient) throw new Error('Supabase is not connected.');
+  const { error } = await supabaseClient.from('dresses').update(mapDressToDb(item)).eq('id', item.id);
+  if (error) throw error;
+  saveInventory();
+  return item;
+}
+
+async function insertOrder(order) {
+  if (!supabaseClient) throw new Error('Supabase is not connected.');
+  const { data, error } = await supabaseClient.from('orders').insert(mapOrderToDb(order)).select().single();
+  if (error) throw error;
+  const savedOrder = mapOrderFromDb(data);
+  orderHistory.unshift(savedOrder);
+  saveOrderHistory();
+  return savedOrder;
+}
+
+function subscribeToRealtimeUpdates() {
+  if (!supabaseClient) return;
+  supabaseClient
+    .channel('dressi-live-data')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dresses' }, async () => {
+      await loadInventoryFromSupabase();
+      renderCurrentPage();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+      await loadOrdersFromSupabase();
+      renderCurrentPage();
+    })
+    .subscribe();
 }
 
 function currency(value) {
@@ -268,7 +421,7 @@ function filteredProducts() {
     const status = window.ProductCard.getStatus(item).label.toLowerCase();
     const matchesFilter = currentFilter === 'all' || status.includes(currentFilter) || (currentFilter === 'low' && status.includes('out'));
     const matchesSearch = [item.name, item.sku, item.type, item.size, item.color, item.vendor]
-      .some(value => value.toLowerCase().includes(term));
+      .some(value => String(value ?? '').toLowerCase().includes(term));
     return matchesFilter && matchesSearch;
   });
 }
@@ -353,8 +506,9 @@ function bindPlaceOrder() {
   const placeOrderButton = document.querySelector('#placeOrderBtn');
   if (!placeOrderButton) return;
 
-  placeOrderButton.addEventListener('click', () => {
+  placeOrderButton.addEventListener('click', async () => {
     if (cartItems.size === 0) return;
+    placeOrderButton.disabled = true;
     const customerNameInput = document.querySelector('#customerNameInput');
     const customerName = customerNameInput.value.trim() || 'Walk-in Customer';
     const selectedItemCount = Array.from(cartItems.values()).reduce((sum, quantity) => sum + quantity, 0);
@@ -372,7 +526,7 @@ function bindPlaceOrder() {
 
     placedOrderCount += 1;
     const orderDate = new Date();
-    orderHistory.unshift({
+    const order = {
       orderNo: `Order #${String(placedOrderCount).padStart(3, '0')}`,
       customerName,
       items: selectedItemCount,
@@ -387,17 +541,30 @@ function bindPlaceOrder() {
         total: entry.item.price * entry.quantity
       })),
       names: orderedItems.map(entry => `${entry.item.name} x${entry.quantity}`).join(', ')
-    });
+    };
     orderedItems.forEach(entry => {
       entry.item.stock -= entry.quantity;
       entry.item.sold = (entry.item.sold || 0) + entry.quantity;
     });
-    cartItems.clear();
-    saveAppData();
-    updateCartCount();
-    showShopPage();
-    if (!els.historyPage.classList.contains('hidden')) {
-      renderHistoryPage();
+
+    try {
+      await Promise.all(orderedItems.map(entry => updateDress(entry.item)));
+      await insertOrder(order);
+      cartItems.clear();
+      saveAppData();
+      updateCartCount();
+      showShopPage();
+      if (!els.historyPage.classList.contains('hidden')) {
+        renderHistoryPage();
+      }
+    } catch (error) {
+      orderedItems.forEach(entry => {
+        entry.item.stock += entry.quantity;
+        entry.item.sold = Math.max(0, (entry.item.sold || 0) - entry.quantity);
+      });
+      placedOrderCount -= 1;
+      window.alert(`Could not place order: ${error.message}`);
+      renderCartPage();
     }
   });
 }
@@ -746,22 +913,32 @@ function openStockPanel(id = activeStockItemId) {
 
   const stockForm = document.querySelector('#stockForm');
   if (stockForm && item) {
-    stockForm.addEventListener('submit', event => {
+    stockForm.addEventListener('submit', async event => {
       event.preventDefault();
+      const submitButton = stockForm.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
       item.stock = Math.max(0, Number(document.querySelector('#stockCountInput').value));
       item.sold = Math.max(0, Number(document.querySelector('#soldInput').value));
-      saveInventory();
-      els.search.value = '';
-      activateAllFilter();
-      renderProducts();
-      renderHeroSlider();
-      closeStockPanel();
-      highlightProduct(item.id);
+
+      try {
+        await updateDress(item);
+        els.search.value = '';
+        activateAllFilter();
+        renderProducts();
+        renderHeroSlider();
+        closeStockPanel();
+        highlightProduct(item.id);
+      } catch (error) {
+        submitButton.disabled = false;
+        window.alert(`Could not save stock: ${error.message}`);
+      }
     });
   }
 
-  document.querySelector('#addItemForm').addEventListener('submit', event => {
+  document.querySelector('#addItemForm').addEventListener('submit', async event => {
     event.preventDefault();
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
     const newItem = {
       id: Math.max(0, ...inventory.map(product => product.id)) + 1,
       name: document.querySelector('#newName').value.trim(),
@@ -778,16 +955,20 @@ function openStockPanel(id = activeStockItemId) {
       image: uploadedImageDataUrl || 'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?auto=format&fit=crop&w=700&q=80'
     };
 
-    inventory.push(newItem);
-    saveInventory();
-    uploadedImageDataUrl = '';
-    activeStockItemId = newItem.id;
-    els.search.value = '';
-    activateAllFilter();
-    renderProducts();
-    renderHeroSlider();
-    closeStockPanel();
-    highlightProduct(newItem.id);
+    try {
+      const savedItem = await insertDress(newItem);
+      uploadedImageDataUrl = '';
+      activeStockItemId = savedItem.id;
+      els.search.value = '';
+      activateAllFilter();
+      renderProducts();
+      renderHeroSlider();
+      closeStockPanel();
+      highlightProduct(savedItem.id);
+    } catch (error) {
+      submitButton.disabled = false;
+      window.alert(`Could not add item: ${error.message}`);
+    }
   });
 
   document.querySelector('#newImageFile').addEventListener('change', event => {
@@ -885,3 +1066,5 @@ document.addEventListener('keydown', event => {
 updateCartCount();
 renderHeroSlider();
 refreshIcons();
+subscribeToRealtimeUpdates();
+loadRemoteData();
