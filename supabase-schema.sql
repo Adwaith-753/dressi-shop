@@ -60,6 +60,23 @@ create policy "Allow public insert orders"
 on orders for insert
 with check (true);
 
+drop policy if exists "Allow public read dress images" on storage.objects;
+drop policy if exists "Allow public upload dress images" on storage.objects;
+drop policy if exists "Allow public update dress images" on storage.objects;
+
+create policy "Allow public read dress images"
+on storage.objects for select
+using (bucket_id = 'dress-images');
+
+create policy "Allow public upload dress images"
+on storage.objects for insert
+with check (bucket_id = 'dress-images');
+
+create policy "Allow public update dress images"
+on storage.objects for update
+using (bucket_id = 'dress-images')
+with check (bucket_id = 'dress-images');
+
 do $$
 begin
   if not exists (

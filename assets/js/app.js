@@ -105,6 +105,7 @@ const els = {
 
 let activeStockItemId = inventory[0]?.id ?? null;
 let uploadedImageDataUrl = '';
+let uploadedImageFile = null;
 let placedOrderCount = 0;
 let heroSlideIndex = 0;
 let heroSlideTimer = null;
@@ -242,6 +243,44 @@ async function insertDress(item) {
   inventory.push(savedItem);
   saveInventory();
   return savedItem;
+}
+
+function safeFileName(value) {
+  return String(value || 'dress')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'dress';
+}
+
+function fileExtension(file) {
+  const nameExtension = file.name.includes('.') ? file.name.split('.').pop() : '';
+  if (nameExtension) return nameExtension.toLowerCase();
+  return (file.type.split('/')[1] || 'jpg').toLowerCase();
+}
+
+async function uploadDressImage(file, sku) {
+  if (!file) return '';
+  if (!supabaseClient) throw new Error('Supabase is not connected.');
+
+  const extension = fileExtension(file);
+  const path = `${Date.now()}-${safeFileName(sku || file.name)}.${extension}`;
+  const { error } = await supabaseClient.storage
+    .from('dress-images')
+    .upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type || 'image/jpeg',
+      upsert: false
+    });
+
+  if (error) throw error;
+
+  const { data } = supabaseClient.storage
+    .from('dress-images')
+    .getPublicUrl(path);
+
+  return data.publicUrl;
 }
 
 async function updateDress(item) {
@@ -939,10 +978,11 @@ function openStockPanel(id = activeStockItemId) {
     event.preventDefault();
     const submitButton = event.currentTarget.querySelector('button[type="submit"]');
     submitButton.disabled = true;
+    const sku = document.querySelector('#newSku').value.trim();
     const newItem = {
       id: Math.max(0, ...inventory.map(product => product.id)) + 1,
       name: document.querySelector('#newName').value.trim(),
-      sku: document.querySelector('#newSku').value.trim(),
+      sku,
       type: document.querySelector('#newType').value.trim(),
       size: document.querySelector('#newSize').value.trim(),
       color: document.querySelector('#newColor').value.trim(),
@@ -952,12 +992,17 @@ function openStockPanel(id = activeStockItemId) {
       vendor: document.querySelector('#newVendor').value.trim(),
       price: Math.max(1, Number(document.querySelector('#newPrice').value)),
       rating: 4,
-      image: uploadedImageDataUrl || 'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?auto=format&fit=crop&w=700&q=80'
+      image: 'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?auto=format&fit=crop&w=700&q=80'
     };
 
     try {
+      const uploadedImageUrl = await uploadDressImage(uploadedImageFile, sku);
+      if (uploadedImageUrl) {
+        newItem.image = uploadedImageUrl;
+      }
       const savedItem = await insertDress(newItem);
       uploadedImageDataUrl = '';
+      uploadedImageFile = null;
       activeStockItemId = savedItem.id;
       els.search.value = '';
       activateAllFilter();
@@ -977,11 +1022,13 @@ function openStockPanel(id = activeStockItemId) {
 
     if (!file) {
       uploadedImageDataUrl = '';
+      uploadedImageFile = null;
       preview.innerHTML = '<span data-icon="image"></span><p>No image selected</p>';
       refreshIcons();
       return;
     }
 
+    uploadedImageFile = file;
     const reader = new FileReader();
     reader.addEventListener('load', () => {
       uploadedImageDataUrl = reader.result;
