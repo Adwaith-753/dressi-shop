@@ -558,7 +558,12 @@ function cartMarkup() {
           <strong>${escapeHtml(item.name)}</strong>
           <span>${quantity} x ${currency(item.price)}</span>
         </div>
-        <strong>${currency(item.price * quantity)}</strong>
+        <div class="cart-row-actions">
+          <strong>${currency(item.price * quantity)}</strong>
+          <button class="cart-remove-btn" type="button" data-remove-cart="${item.id}" aria-label="Remove one ${escapeHtml(item.name)} from cart">
+            <span data-icon="x"></span>
+          </button>
+        </div>
       </article>
     `;
   }).join('');
@@ -591,6 +596,9 @@ function cartMarkup() {
         <span data-icon="check-circle"></span>
         Place Order
       </button>
+      <button class="outline-btn clear-cart-btn" type="button" id="clearCartBtn" ${cartCount === 0 ? 'disabled' : ''}>
+        Clear Cart
+      </button>
     </div>
   `;
 }
@@ -609,13 +617,6 @@ function bindPlaceOrder() {
       const item = inventory.find(product => product.id === id);
       return { item, quantity };
     }).filter(entry => entry.item);
-
-    const unavailableItem = orderedItems.find(entry => entry.quantity > entry.item.stock);
-    if (unavailableItem) {
-      window.alert(`${unavailableItem.item.name} does not have enough stock for this order.`);
-      renderCartPage();
-      return;
-    }
 
     placedOrderCount += 1;
     const orderDate = new Date();
@@ -636,7 +637,6 @@ function bindPlaceOrder() {
       names: orderedItems.map(entry => `${entry.item.name} x${entry.quantity}`).join(', ')
     };
     orderedItems.forEach(entry => {
-      entry.item.stock -= entry.quantity;
       entry.item.sold = (entry.item.sold || 0) + entry.quantity;
     });
 
@@ -652,7 +652,6 @@ function bindPlaceOrder() {
       }
     } catch (error) {
       orderedItems.forEach(entry => {
-        entry.item.stock += entry.quantity;
         entry.item.sold = Math.max(0, (entry.item.sold || 0) - entry.quantity);
       });
       placedOrderCount -= 1;
@@ -662,12 +661,90 @@ function bindPlaceOrder() {
   });
 }
 
+async function returnCartItemToStock(id, quantity = 1) {
+  const item = inventory.find(product => product.id === id);
+  if (!item || !cartItems.has(id)) return;
+
+  const currentQuantity = cartItems.get(id);
+  const returnQuantity = Math.min(quantity, currentQuantity);
+  const previousStock = item.stock;
+
+  item.stock += returnQuantity;
+  if (currentQuantity === returnQuantity) {
+    cartItems.delete(id);
+  } else {
+    cartItems.set(id, currentQuantity - returnQuantity);
+  }
+
+  try {
+    await updateDress(item);
+    updateCartCount();
+    renderCartPage();
+    renderProducts();
+    renderHeroSlider();
+  } catch (error) {
+    item.stock = previousStock;
+    cartItems.set(id, currentQuantity);
+    window.alert(`Could not update cart: ${error.message}`);
+    renderCartPage();
+  }
+}
+
+async function clearCart() {
+  const entries = Array.from(cartItems.entries());
+  if (entries.length === 0) return;
+
+  const previousStocks = new Map(entries.map(([id]) => {
+    const item = inventory.find(product => product.id === id);
+    return [id, item?.stock ?? 0];
+  }));
+  const previousCart = new Map(cartItems);
+
+  entries.forEach(([id, quantity]) => {
+    const item = inventory.find(product => product.id === id);
+    if (item) item.stock += quantity;
+  });
+  cartItems.clear();
+
+  try {
+    await Promise.all(entries.map(([id]) => {
+      const item = inventory.find(product => product.id === id);
+      return item ? updateDress(item) : Promise.resolve();
+    }));
+    updateCartCount();
+    renderCartPage();
+    renderProducts();
+    renderHeroSlider();
+  } catch (error) {
+    previousStocks.forEach((stock, id) => {
+      const item = inventory.find(product => product.id === id);
+      if (item) item.stock = stock;
+    });
+    cartItems.clear();
+    previousCart.forEach((quantity, id) => cartItems.set(id, quantity));
+    window.alert(`Could not clear cart: ${error.message}`);
+    renderCartPage();
+  }
+}
+
 function renderCartPage() {
   els.cartPageContent.innerHTML = cartMarkup();
   bindPlaceOrder();
 
   refreshIcons();
 }
+
+els.cartPageContent.addEventListener('click', event => {
+  const removeButton = event.target.closest('[data-remove-cart]');
+  if (removeButton) {
+    returnCartItemToStock(Number(removeButton.dataset.removeCart));
+    return;
+  }
+
+  if (event.target.closest('#clearCartBtn')) {
+    clearCart();
+  }
+});
 
 function renderHistoryPage() {
   const term = els.historySearch.value.trim().toLowerCase();
@@ -944,17 +1021,27 @@ function clearHistoryDateFilter() {
   renderHistoryPage();
 }
 
-function addToCart(id) {
+async function addToCart(id) {
   const item = inventory.find(product => product.id === id);
   if (!item || item.stock <= 0) return;
-  const quantityInCart = cartItems.get(id) || 0;
+  const previousStock = item.stock;
+  const previousQuantity = cartItems.get(id) || 0;
 
-  if (quantityInCart >= item.stock) {
-    window.alert('No more stock is available for this dress.');
+  item.stock -= 1;
+  cartItems.set(id, previousQuantity + 1);
+
+  try {
+    await updateDress(item);
+  } catch (error) {
+    item.stock = previousStock;
+    if (previousQuantity === 0) {
+      cartItems.delete(id);
+    } else {
+      cartItems.set(id, previousQuantity);
+    }
+    window.alert(`Could not add to cart: ${error.message}`);
     return;
   }
-
-  cartItems.set(id, quantityInCart + 1);
 
   renderProducts();
   updateCartCount();

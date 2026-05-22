@@ -777,6 +777,29 @@ select:focus {
   grid-template-columns: 64px minmax(0, 1fr) auto;
 }
 
+.cart-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cart-remove-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+}
+
+.cart-remove-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .cart-row img {
   width: 64px;
   height: 64px;
@@ -804,6 +827,11 @@ select:focus {
 
 .place-order-btn {
   width: 100%;
+}
+
+.clear-cart-btn {
+  width: 100%;
+  margin-top: 10px;
 }
 
 .history-row {
